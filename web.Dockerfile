@@ -1,4 +1,3 @@
-# You can set the Swift version to what you need for your app. Versions can be found here: https://hub.docker.com/_/swift
 FROM swift:5.1.1 as builder
 
 # For local build, add `--build-arg env=docker`
@@ -6,12 +5,10 @@ FROM swift:5.1.1 as builder
 ARG env
 
 RUN apt-get -qq update && apt-get install -y \
-  libssl-dev zlib1g-dev \
-  && rm -r /var/lib/apt/lists/*
+  libssl-dev zlib1g-dev
 WORKDIR /app
 COPY . .
-RUN mkdir -p /build/lib && cp -R /usr/lib/swift/linux/*.so* /build/lib
-RUN swift build -c release && mv `swift build -c release --show-bin-path` /build/bin
+RUN swift build -c release && mkdir /build && mv `swift build -c release --show-bin-path` /build/bin
 
 # Production image
 FROM ubuntu:18.04
@@ -22,11 +19,9 @@ RUN apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   && rm -r /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/bin/Run .
-COPY --from=builder /build/lib/* /usr/lib/
+COPY --from=builder /usr/lib/swift/linux/*.so* /usr/lib/swift/linux/
 # Uncomment the next line if you need to load resources from the `Public` directory
 #COPY --from=builder /app/Public ./Public
-# Uncomment the next line if you are using Leaf
-#COPY --from=builder /app/Resources ./Resources
 ENV ENVIRONMENT=$env
 
 ENTRYPOINT ./Run serve --env $ENVIRONMENT --hostname 0.0.0.0 --port 80
