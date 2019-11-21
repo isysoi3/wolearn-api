@@ -24,4 +24,4 @@ COPY --from=builder /usr/lib/swift/linux/*.so* /usr/lib/swift/linux/
 #COPY --from=builder /app/Public ./Public
 ENV ENVIRONMENT=$env
 
-ENTRYPOINT ./Run serve --env $ENVIRONMENT --hostname 0.0.0.0 --port 80
+ENTRYPOINT ./Run serve --env $ENVIRONMENT --hostname 0.0.0.0 --port $PORT

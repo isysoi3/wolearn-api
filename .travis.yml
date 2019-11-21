@@ -1,0 +1,37 @@
+# Only create a build job IF the branch is 'master'
+branches:
+  only:
+  - master
+
+services:
+  - docker
+
+jobs:
+  include:
+
+  - stage: Linux test
+    os: linux
+    language: shell
+    dist: trusty
+    install:
+    - eval "$(curl -sL https://swiftenv.fuller.li/install.sh)"
+    - eval "$(curl -sL https://apt.vapor.sh)"
+    - sudo apt-get install swift vapor
+    script:
+    - swift test
+
+  # The second stage will run all tests on macOS
+  - stage: OSX test
+    os: osx
+    osx_image: xcode11
+    language: swift
+    before_script:
+    - brew tap vapor/tap
+    - brew install vapor/tap/vapor
+    script:
+    - swift test
+
+after_success:
+  - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+  - docker build -t isysoi/wolearn_api -f web.Dockerfile .;
+  - docker push "$DOCKER_USERNAME"/wolearn_api;

@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.3"
 
 services:
 
@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: web.Dockerfile
-    image: wolearn_api
+    image: isysoi/wolearn_api
     environment:
       ENVIRONMENT: dev
     ports:
