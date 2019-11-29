@@ -14,7 +14,6 @@ struct WordCategory: PostgreSQLModel {
     typealias ID = Int
     
     static let entity = "category"
-    static let name: String = "category"
     
     var id: ID?
     var name: String
