@@ -21,13 +21,28 @@ public func routes(_ router: Router) throws {
         }
     }
     
-    router.get("\(apiVersion)/categories") { req in
-        return WordCategory.query(on: req).all().map { (wordCategories) -> [UserWordCategory] in
-            return wordCategories.map {
-                return UserWordCategory.init(category: $0,
-                                             isSelected: true)
+    router.get("\(apiVersion)/categories", String.parameter) { req -> Future<[UserWordCategory]> in
+        let login = try req.parameters.next(String.self)
+        return req.requestPooledConnection(to: .psql).flatMap { conn in
+            defer { try? req.releasePooledConnection(conn, to: .psql) }
+            return conn
+                .raw("""
+                    select category.*
+                    from \"user\" u
+                    join category on category.id = ANY(u.categories)
+                    where u.login = '\(login)'
+                    """)
+                .all(decoding: WordCategory.self)
+                .and(WordCategory.query(on: req).all())
+                .map { (arg) -> [UserWordCategory] in
+                    let (userWordCategories, wordCategories) = arg
+                    return wordCategories.map { category in
+                        return UserWordCategory(category: category,
+                                                isSelected: userWordCategories.contains(where: { $0 == category }))
+                    }
             }
         }
+        
     }
     
     router.get("\(apiVersion)/words") { req in

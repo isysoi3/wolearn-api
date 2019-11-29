@@ -11,14 +11,16 @@ import Vapor
 
 struct WordCategory: PostgreSQLModel {
     
-    static let entity: String = "category"
-    static let name = "category"
+    typealias ID = Int
     
-    var id: Int?
+    static let entity = "category"
+    static let name: String = "category"
+    
+    var id: ID?
     var name: String
     var image: String
     
-    init(id: Int? = nil, name: String, image: String) {
+    init(id: ID? = nil, name: String, image: String) {
         self.id = id
         self.name = name
         self.image = image
@@ -27,6 +29,8 @@ struct WordCategory: PostgreSQLModel {
 
 /// Allows `WordCategory` to be used as a dynamic migration.
 extension WordCategory: PostgreSQLMigration { }
+
+extension WordCategory: Equatable { }
 
 struct UserWordCategory: Content {
     
