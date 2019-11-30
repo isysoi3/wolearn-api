@@ -80,8 +80,21 @@ public func routes(_ router: Router) throws {
             }
     }
 
-    router.get("\(apiVersion)/words") { _ in
-        return wordsExample
+    router.get("\(apiVersion)/words") { req -> Future<[LearningWord]> in
+        guard let login = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+        return Word.query(on: req)
+            .all()
+            .map { words in
+                return words.map { word in
+                    return LearningWord(word: word,
+                                        quiz: Quiz(indexOfRight: 0, options: ["Having or marked by great physical power",
+                    "A short talk or conversation:",
+                    "a procedure intended to establish the quality, performance, or reliability of something, especially before it is taken into widespread use.",
+                    "Lacking the power to perform physically demanding tasks; having little physical strength or energy"]))
+                }
+            }
     }
 
     // Example of configuring a controller
