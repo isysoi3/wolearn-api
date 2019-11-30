@@ -8,10 +8,10 @@ struct PostgreSQLVersion: Codable {
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
     // Basic "It works" example
-    router.get { req in
+    router.get { _ in
         return "It works!"
     }
-    
+
     router.get("sql") { req in
         return req.withPooledConnection(to: .psql) { conn in
             return conn.raw("SELECT version()")
@@ -20,7 +20,7 @@ public func routes(_ router: Router) throws {
             return rows[0].version
         }
     }
-    
+
     router.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
         guard let login = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
@@ -39,7 +39,7 @@ public func routes(_ router: Router) throws {
                 }
         }
     }
-    
+
     router.post("\(apiVersion)/categories") { req -> Future<HTTPResponse> in
         struct TMP: Content {
             let id: Int
@@ -71,8 +71,8 @@ public func routes(_ router: Router) throws {
                 return user.update(on: req).map { _ in HTTPResponse() }
         }
     }
-    
-    router.get("\(apiVersion)/words") { req in
+
+    router.get("\(apiVersion)/words") { _ in
         return wordsExample
     }
 

@@ -10,17 +10,16 @@ import FluentPostgreSQL
 import Vapor
 
 struct User: PostgreSQLModel {
-    
+
     typealias ID = Int
-    
+
     static let entity = "user"
     static let name: String = "user"
-    
+
     var id: ID?
     var login: String
     var categories: [Int]?
-    
-    
+
     init(id: ID? = nil, login: String, categories: [Int]) {
         self.id = id
         self.login = login

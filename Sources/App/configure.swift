@@ -3,9 +3,9 @@ import Vapor
 
 /// Called before your application initializes.
 public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
-    
+
     try services.register(FluentPostgreSQLProvider())
-    
+
     guard
         let dbPassword = Environment.get("DB_PASSWORD"),
         let dbUsername = Environment.get("DB_USERNAME"),

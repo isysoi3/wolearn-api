@@ -15,7 +15,7 @@ struct Word: Content {
     let transcription: String
     let examples: [String]
     let quiz: Quiz
-    
+
 }
 
 struct Quiz: Content {
