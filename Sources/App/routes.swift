@@ -41,35 +41,43 @@ public func routes(_ router: Router) throws {
     }
 
     router.post("\(apiVersion)/categories") { req -> Future<HTTPResponse> in
-        struct TMP: Content {
-            let id: Int
-            let isSelected: Bool
+        struct RequestInfo: Content {
+            struct RequestCategory: Content {
+                let id: Int
+                let isSelected: Bool
+            }
+            var token: String
+            var categories: [RequestCategory]
         }
-        guard let uCategories = try? req.content.decode([TMP].self) else {
-            throw Abort(.badRequest, reason: "No id")
+        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
+            throw Abort(.badRequest, reason: "No requestInfo")
         }
-        return User.query(on: req)
-            .filter(\.login, .equal, "test")
-            .first()
-            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
-            .and(uCategories)
-            .then { arg -> EventLoopFuture<HTTPResponse> in
-                var (user, newCategories) = arg
-                var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
-                user.categories?.forEach { categoryId in
-                    if !newUserCategories.contains(where: {$0 == categoryId}) {
-                        newUserCategories.append(categoryId)
-                    }
-                }
-                newCategories.compactMap { !$0.isSelected ? $0.id : nil }
-                    .forEach { categoryId in
-                        if newUserCategories.contains(where: {$0 == categoryId}) {
-                            newUserCategories.removeAll(where: {$0 == categoryId})
+        return requestInfo
+            .then { info -> EventLoopFuture<HTTPResponse> in
+                let newCategories = info.categories
+                let token = info.token
+                return User.query(on: req)
+                    .filter(\.login, .equal, token)
+                    .first()
+                    .unwrap(or: Abort(.unauthorized, reason: "User not found"))
+                    .then { user -> EventLoopFuture<HTTPResponse> in
+                        var user = user
+                        var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
+                        user.categories?.forEach { categoryId in
+                            if !newUserCategories.contains(where: {$0 == categoryId}) {
+                                newUserCategories.append(categoryId)
+                            }
                         }
+                        newCategories.compactMap { !$0.isSelected ? $0.id : nil }
+                            .forEach { categoryId in
+                                if newUserCategories.contains(where: {$0 == categoryId}) {
+                                    newUserCategories.removeAll(where: {$0 == categoryId})
+                                }
+                        }
+                        user.categories = newUserCategories
+                        return user.update(on: req).map { _ in HTTPResponse() }
                 }
-                user.categories = newUserCategories
-                return user.update(on: req).map { _ in HTTPResponse() }
-        }
+            }
     }
 
     router.get("\(apiVersion)/words") { _ in
