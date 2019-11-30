@@ -21,28 +21,55 @@ public func routes(_ router: Router) throws {
         }
     }
     
-    router.get("\(apiVersion)/categories", String.parameter) { req -> Future<[UserWordCategory]> in
-        let login = try req.parameters.next(String.self)
-        return req.requestPooledConnection(to: .psql).flatMap { conn in
-            defer { try? req.releasePooledConnection(conn, to: .psql) }
-            return conn
-                .raw("""
-                    select category.*
-                    from \"user\" u
-                    join category on category.id = ANY(u.categories)
-                    where u.login = '\(login)'
-                    """)
-                .all(decoding: WordCategory.self)
-                .and(WordCategory.query(on: req).all())
-                .map { (arg) -> [UserWordCategory] in
-                    let (userWordCategories, wordCategories) = arg
-                    return wordCategories.map { category in
-                        return UserWordCategory(category: category,
-                                                isSelected: userWordCategories.contains(where: { $0 == category }))
-                    }
-            }
+    router.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
+        guard let login = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
         }
-        
+        return User.query(on: req)
+            .filter(\.login, .equal, login)
+            .first()
+            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .and(WordCategory.query(on: req).all())
+            .map { (arg) -> [UserWordCategory] in
+                let (user, wordCategories) = arg
+                return wordCategories.map { category in
+                    let isSelected = user.categories?.contains(category.id!) ?? false
+                    return UserWordCategory(category: category,
+                                            isSelected: isSelected)
+                }
+        }
+    }
+    
+    router.post("\(apiVersion)/categories") { req -> Future<HTTPResponse> in
+        struct TMP: Content {
+            let id: Int
+            let isSelected: Bool
+        }
+        guard let uCategories = try? req.content.decode([TMP].self) else {
+            throw Abort(.badRequest, reason: "No id")
+        }
+        return User.query(on: req)
+            .filter(\.login, .equal, "test")
+            .first()
+            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .and(uCategories)
+            .then { arg -> EventLoopFuture<HTTPResponse> in
+                var (user, newCategories) = arg
+                var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
+                user.categories?.forEach { categoryId in
+                    if !newUserCategories.contains(where: {$0 == categoryId}) {
+                        newUserCategories.append(categoryId)
+                    }
+                }
+                newCategories.compactMap { !$0.isSelected ? $0.id : nil }
+                    .forEach { categoryId in
+                        if newUserCategories.contains(where: {$0 == categoryId}) {
+                            newUserCategories.removeAll(where: {$0 == categoryId})
+                        }
+                }
+                user.categories = newUserCategories
+                return user.update(on: req).map { _ in HTTPResponse() }
+        }
     }
     
     router.get("\(apiVersion)/words") { req in
