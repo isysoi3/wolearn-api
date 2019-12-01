@@ -10,11 +10,7 @@ import Vapor
 
 struct RequestCategoryData: Content {
 
-    struct RequestCategory: Content {
-        let id: Int
-        let isSelected: Bool
-    }
+    let id: Int
+    let isSelected: Bool
 
-    var token: String
-    var categories: [RequestCategory]
 }

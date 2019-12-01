@@ -7,6 +7,7 @@ struct PostgreSQLVersion: Codable {
 
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
+
     // Basic "It works" example
     router.get { _ in
         return "It works!"
@@ -22,11 +23,11 @@ public func routes(_ router: Router) throws {
     }
 
     router.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
-        guard let login = try? req.query.get(String.self, at: ["token"]) else {
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
         return User.query(on: req)
-            .filter(\.login, .equal, login)
+            .filter(\.login, .equal, token)
             .first()
             .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
             .and(WordCategory.query(on: req).all())
@@ -41,13 +42,14 @@ public func routes(_ router: Router) throws {
     }
 
     router.post("\(apiVersion)/categories") { req -> Future<HTTPStatus> in
-        guard let requestInfo = try? req.content.decode(RequestCategoryData.self) else {
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+        guard let requestInfo = try? req.content.decode([RequestCategoryData].self) else {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
         return requestInfo
-            .then { info -> EventLoopFuture<HTTPStatus> in
-                let newCategories = info.categories
-                let token = info.token
+            .then { newCategories -> EventLoopFuture<HTTPStatus> in
                 return User.query(on: req)
                     .filter(\.login, .equal, token)
                     .first()
@@ -88,6 +90,9 @@ public func routes(_ router: Router) throws {
     }
 
     router.post("\(apiVersion)/word") { req -> Future<RequestWordData> in
+        guard let _ = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
         //        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
         //            throw Abort(.badRequest, reason: "No requestInfo")
         //        }
