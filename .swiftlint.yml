@@ -11,7 +11,8 @@ included: # paths to include during linting. `--path` is ignored if present.
   - Sources
 excluded: # paths to ignore during linting. Takes precedence over `included`.
   - Dependencies
-  - R.generated.swift
+  - Test
+  - Products
 analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
   - explicit_self
 
