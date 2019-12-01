@@ -41,15 +41,7 @@ public func routes(_ router: Router) throws {
     }
 
     router.post("\(apiVersion)/categories") { req -> Future<HTTPResponse> in
-        struct RequestInfo: Content {
-            struct RequestCategory: Content {
-                let id: Int
-                let isSelected: Bool
-            }
-            var token: String
-            var categories: [RequestCategory]
-        }
-        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
+        guard let requestInfo = try? req.content.decode(RequestCategoryData.self) else {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
         return requestInfo
@@ -97,19 +89,11 @@ public func routes(_ router: Router) throws {
             }
     }
 
-    struct RequestInfoT: Content {
-        struct RequestWord: Content {
-            let id: Int
-            let isMemorized: Bool
-        }
-        var token: String
-        var word: RequestWord
-    }
-    router.post("\(apiVersion)/word") { req -> Future<RequestInfoT> in
+    router.post("\(apiVersion)/word") { req -> Future<RequestWordData> in
         //        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
         //            throw Abort(.badRequest, reason: "No requestInfo")
         //        }
-        return try req.content.decode(RequestInfoT.self)
+        return try req.content.decode(RequestWordData.self)
     }
 
     // Example of configuring a controller
