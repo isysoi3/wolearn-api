@@ -44,14 +44,6 @@ public func routes(_ router: Router) throws {
     router.post("\(apiVersion)/register") { req -> Future<HTTPStatus> in
         return try req.content
             .decode(User.self)
-            .map { arg -> User in
-                var user = arg
-                guard let hashPWD = try? BCrypt.hash(user.password, cost: 5) else {
-                    throw Abort(.unauthorized, reason: "Some error")
-                }
-                user.password = hashPWD
-                return user
-            }
             .save(on: req).map { _ in HTTPStatus.ok }
     }
 

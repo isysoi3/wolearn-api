@@ -8,6 +8,7 @@
 import Foundation
 import FluentPostgreSQL
 import Vapor
+import Crypto
 
 struct User: PostgreSQLModel {
 
@@ -52,6 +53,19 @@ extension User: PostgreSQLMigration {
 
     static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return conn.future()
+    }
+
+}
+
+extension User {
+
+    func willCreate(on conn: PostgreSQLConnection) throws -> EventLoopFuture<User> {
+        var user = self
+        guard let hashPWD = try? BCrypt.hash(user.password, cost: 5) else {
+            throw Abort(.unauthorized, reason: "Some error")
+        }
+        user.password = hashPWD
+        return Future.map(on: conn) { user }
     }
 
 }
