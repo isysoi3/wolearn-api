@@ -40,19 +40,19 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.post("\(apiVersion)/categories") { req -> Future<HTTPResponse> in
+    router.post("\(apiVersion)/categories") { req -> Future<HTTPStatus> in
         guard let requestInfo = try? req.content.decode(RequestCategoryData.self) else {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
         return requestInfo
-            .then { info -> EventLoopFuture<HTTPResponse> in
+            .then { info -> EventLoopFuture<HTTPStatus> in
                 let newCategories = info.categories
                 let token = info.token
                 return User.query(on: req)
                     .filter(\.login, .equal, token)
                     .first()
                     .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-                    .then { user -> EventLoopFuture<HTTPResponse> in
+                    .then { user -> EventLoopFuture<HTTPStatus> in
                         var user = user
                         var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
                         user.categories?.forEach { categoryId in
@@ -67,7 +67,7 @@ public func routes(_ router: Router) throws {
                                 }
                         }
                         user.categories = newUserCategories
-                        return user.update(on: req).map { _ in HTTPResponse() }
+                        return user.update(on: req).map { _ in HTTPStatus.ok }
                 }
             }
     }
