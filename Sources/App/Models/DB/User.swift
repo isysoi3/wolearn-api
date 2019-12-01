@@ -18,16 +18,42 @@ struct User: PostgreSQLModel {
 
     var id: ID?
     var login: String
+    var name: String
+    var surname: String
+    var password: String
     var categories: [Int]?
 
-    init(id: ID? = nil, login: String, categories: [Int]) {
+    init(id: ID? = nil,
+         login: String,
+         name: String,
+         surname: String,
+         password: String,
+         categories: [Int] = []) {
         self.id = id
         self.login = login
+        self.name = name
+        self.surname = surname
+        self.password = password
         self.categories = categories
     }
 }
 
 /// Allows `User` to be used as a dynamic migration.
-extension User: PostgreSQLMigration { }
+extension User: PostgreSQLMigration {
+
+    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return Database.update(User.self, on: conn) { builder in
+            let defaultValueConstraint = PostgreSQLColumnConstraint.default(.literal(""))
+            builder.field(for: \.name, type: PostgreSQLDataType.text, defaultValueConstraint)
+            builder.field(for: \.surname, type: PostgreSQLDataType.text, defaultValueConstraint)
+            builder.field(for: \.password, type: PostgreSQLDataType.text, defaultValueConstraint)
+        }
+    }
+
+    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return conn.future()
+    }
+
+}
 
 extension User: Content { }

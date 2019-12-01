@@ -1,4 +1,5 @@
 import Vapor
+import Crypto
 
 private let apiVersion = "api/v1"
 struct PostgreSQLVersion: Codable {
@@ -8,7 +9,7 @@ struct PostgreSQLVersion: Codable {
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
 
-    // Basic "It works" example
+    // MARK: - some info
     router.get { _ in
         return "It works!"
     }
@@ -22,6 +23,39 @@ public func routes(_ router: Router) throws {
         }
     }
 
+    // MARK: - no auth
+    router.post("\(apiVersion)/login") { req -> Future<Token> in
+        return try req.content.decode(RequestLoginData.self)
+            .then { requestInfo in
+                return User.query(on: req)
+                    .filter(\.login, .equal, requestInfo.login)
+                    .first()
+                    .unwrap(or: Abort(.unauthorized, reason: "User not found"))
+                    .map { user in
+                        guard (try? BCrypt.verify(requestInfo.password, created: user.password)) != nil else {
+                            throw Abort(.unauthorized, reason: "User not found")
+                        }
+                        return Token(token: user.login)
+                }
+
+        }
+    }
+
+    router.post("\(apiVersion)/register") { req -> Future<HTTPStatus> in
+        return try req.content
+            .decode(User.self)
+            .map { arg -> User in
+                var user = arg
+                guard let hashPWD = try? BCrypt.hash(user.password, cost: 5) else {
+                    throw Abort(.unauthorized, reason: "Some error")
+                }
+                user.password = hashPWD
+                return user
+            }
+            .save(on: req).map { _ in HTTPStatus.ok }
+    }
+
+    // MARK: - auth
     router.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
         guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
