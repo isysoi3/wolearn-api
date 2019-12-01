@@ -73,19 +73,18 @@ public func routes(_ router: Router) throws {
     }
 
     router.get("\(apiVersion)/words") { req -> Future<[LearningWord]> in
-        guard let login = try? req.query.get(String.self, at: ["token"]) else {
+        guard let _ = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
         return Word.query(on: req)
+            .join(\Quiz.wordId, to: \Word.id)
+            .alsoDecode(Quiz.self)
             .all()
-            .and(Quiz.query(on: req).all())
-            .map { (arg) -> [LearningWord]  in
-                let (words, quizes) = arg
-                return words.map { word in
-                    return LearningWord(word: word,
-                                        quiz: quizes.first(where: {$0.wordId == word.id})!)
+            .map { array -> [LearningWord] in
+                return array.map { word, quiz -> LearningWord in
+                    LearningWord(word: word, quiz: quiz)
                 }
-            }
+        }
     }
 
     router.post("\(apiVersion)/word") { req -> Future<RequestWordData> in

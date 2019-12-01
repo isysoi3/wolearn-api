@@ -15,12 +15,15 @@ struct Quiz: PostgreSQLModel {
     static let entity = "quiz"
 
     var id: ID?
-    let wordId: ID
     let rightAnswer: String
     let options: [String]
+    let wordId: Word.ID
+    var word: Parent<Quiz, Word> {
+        return parent(\.wordId)
+    }
 
     init(id: ID? = nil,
-         wordId: ID,
+         wordId: Word.ID,
          rightAnswer: String,
          options: [String]) {
         self.id = id

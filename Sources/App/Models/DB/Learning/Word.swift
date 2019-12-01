@@ -20,7 +20,9 @@ struct Word: PostgreSQLModel {
     var pos: String
     var transcription: String
     var examples: [String]
-//    let quiz: Quiz
+    var quiz: Children<Word, Quiz> {
+        return self.children(\.wordId)
+    }
 
     init(id: ID? = nil,
          name: String,
