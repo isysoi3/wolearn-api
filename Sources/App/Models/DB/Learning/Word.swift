@@ -46,7 +46,7 @@ struct LearningWord: Content {
     var pos: String
     var transcription: String
     var examples: [String]
-    let quiz: Quiz
+    let quiz: LearningQuiz
 
     init(word: Word, quiz: Quiz) {
         self.id = word.id
@@ -54,29 +54,6 @@ struct LearningWord: Content {
         self.pos = word.pos
         self.transcription = word.transcription
         self.examples = word.examples
-        self.quiz = quiz
+        self.quiz = LearningQuiz(quiz: quiz)
     }
-
 }
-
-struct Quiz: Content {
-    let indexOfRight: Int
-    let options: [String]
-}
-
-/*
- quiz: Quiz(indexOfRight: 0, options: ["Having or marked by great physical power",
- "A short talk or conversation:",
- "a procedure intended to establish the quality, performance, or reliability of something, especially before it is taken into widespread use.",
- "Lacking the power to perform physically demanding tasks; having little physical strength or energy"])
- 
- quiz: Quiz(indexOfRight: 3, options: ["",
-                                       "",
-                                       "",
-                                       "a feeling of expectation and desire for a particular thing to happen."])
- quiz: Quiz(indexOfRight: 1, options: ["lay hold of (something) with one's hands; reach for and hold",
-                                                                       "make (an idea or situation) clear to someone by describing it in more detail or revealing relevant facts.",
-                                                                       "come to have (something); receive",
-                                                                       "move from one place to another; travel"])
- 
- */

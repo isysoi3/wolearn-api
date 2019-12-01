@@ -78,13 +78,12 @@ public func routes(_ router: Router) throws {
         }
         return Word.query(on: req)
             .all()
-            .map { words in
+            .and(Quiz.query(on: req).all())
+            .map { (arg) -> [LearningWord]  in
+                let (words, quizes) = arg
                 return words.map { word in
                     return LearningWord(word: word,
-                                        quiz: Quiz(indexOfRight: 0, options: ["Having or marked by great physical power",
-                    "A short talk or conversation:",
-                    "a procedure intended to establish the quality, performance, or reliability of something, especially before it is taken into widespread use.",
-                    "Lacking the power to perform physically demanding tasks; having little physical strength or energy"]))
+                                        quiz: quizes.first(where: {$0.wordId == word.id})!)
                 }
             }
     }
