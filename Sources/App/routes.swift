@@ -97,6 +97,21 @@ public func routes(_ router: Router) throws {
             }
     }
 
+    struct RequestInfoT: Content {
+        struct RequestWord: Content {
+            let id: Int
+            let isMemorized: Bool
+        }
+        var token: String
+        var word: RequestWord
+    }
+    router.post("\(apiVersion)/word") { req -> Future<RequestInfoT> in
+        //        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
+        //            throw Abort(.badRequest, reason: "No requestInfo")
+        //        }
+        return try req.content.decode(RequestInfoT.self)
+    }
+
     // Example of configuring a controller
 //    let todoController = TodoController()
 //    router.get("todos", use: todoController.index)
