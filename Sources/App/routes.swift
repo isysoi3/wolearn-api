@@ -135,7 +135,7 @@ public func routes(_ router: Router) throws {
             .first()
             .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .map { user -> UserInfo in
-                let stats = UserStatistics(today: 1, total: 1, categories: 1)
+                let stats = UserStatistics(today: 1, total: 1, categories: user.categories?.count ?? 0)
                 return UserInfo(info: user.public, statistics: stats)
         }
     }
