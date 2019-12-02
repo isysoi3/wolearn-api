@@ -29,7 +29,7 @@ struct User: PostgreSQLModel {
          name: String,
          surname: String,
          password: String,
-         categories: [Int] = []) {
+         categories: [Int]? = nil) {
         self.id = id
         self.login = login
         self.name = name
@@ -37,6 +37,25 @@ struct User: PostgreSQLModel {
         self.password = password
         self.categories = categories
     }
+
+    struct Public: Content {
+        var id: ID?
+        var login: String
+        var name: String
+        var surname: String
+
+        fileprivate init(user: User) {
+            self.id = user.id
+            self.login = user.login
+            self.name = user.name
+            self.surname = user.surname
+        }
+    }
+
+    var `public`: Public {
+        return Public(user: self)
+    }
+
 }
 
 /// Allows `User` to be used as a dynamic migration.
@@ -70,4 +89,18 @@ extension User {
 
 }
 
-extension User: Content { }
+extension User {
+    func convetToPublic() -> User.Public {
+        self.public
+    }
+}
+
+extension Future where T == User {
+    func convertToPublic() -> Future<User.Public> {
+        return self.map(to: User.Public.self) { user in
+            return user.convetToPublic()
+        }
+    }
+}
+
+//extension User: Content { }

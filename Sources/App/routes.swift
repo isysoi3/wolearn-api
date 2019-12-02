@@ -125,6 +125,21 @@ public func routes(_ router: Router) throws {
         return try req.content.decode(RequestWordData.self)
     }
 
+    router.get("\(apiVersion)/user") { req -> Future<UserInfo> in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+
+        return User.query(on: req)
+            .filter(\.login, .equal, token)
+            .first()
+            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
+            .map { user -> UserInfo in
+                let stats = UserStatistics(today: 1, total: 1, categories: 1)
+                return UserInfo(info: user.public, statistics: stats)
+        }
+    }
+
     // Example of configuring a controller
 //    let todoController = TodoController()
 //    router.get("todos", use: todoController.index)
