@@ -7,6 +7,7 @@ struct PostgreSQLVersion: Codable {
 }
 
 /// Register your application's routes here.
+// swiftlint:disable function_body_length
 public func routes(_ router: Router) throws {
 
     // MARK: - some info
@@ -44,7 +45,8 @@ public func routes(_ router: Router) throws {
     router.post("\(apiVersion)/register") { req -> Future<HTTPStatus> in
         return try req.content
             .decode(User.self)
-            .save(on: req).map { _ in HTTPStatus.ok }
+            .save(on: req)
+            .transform(to: HTTPStatus.ok )
     }
 
     // MARK: - auth
@@ -75,12 +77,12 @@ public func routes(_ router: Router) throws {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
         return requestInfo
-            .then { newCategories -> EventLoopFuture<HTTPStatus> in
+            .then { newCategories -> EventLoopFuture<User> in
                 return User.query(on: req)
                     .filter(\.login, .equal, token)
                     .first()
                     .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-                    .then { user -> EventLoopFuture<HTTPStatus> in
+                    .then { user -> EventLoopFuture<User> in
                         var user = user
                         var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
                         user.categories?.forEach { categoryId in
@@ -95,9 +97,10 @@ public func routes(_ router: Router) throws {
                                 }
                         }
                         user.categories = newUserCategories
-                        return user.update(on: req).map { _ in HTTPStatus.ok }
+                        return user.update(on: req)
                 }
             }
+        .transform(to: HTTPStatus.ok )
     }
 
     router.get("\(apiVersion)/words") { req -> Future<[LearningWord]> in
@@ -115,14 +118,36 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.post("\(apiVersion)/word") { req -> Future<RequestWordData> in
-        guard let _ = try? req.query.get(String.self, at: ["token"]) else {
+    router.post("\(apiVersion)/word") { req -> Future<HTTPStatus> in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
-        //        guard let requestInfo = try? req.content.decode(RequestInfo.self) else {
-        //            throw Abort(.badRequest, reason: "No requestInfo")
-        //        }
-        return try req.content.decode(RequestWordData.self)
+        guard let requestInfo = try? req.content.decode(RequestWordData.self) else {
+            throw Abort(.badRequest, reason: "No requestInfo")
+        }
+
+        return User.query(on: req)
+            .filter(\.login, .equal, token)
+            .first()
+            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .and(requestInfo)
+            .then { arg -> Future<HTTPStatus> in
+                let (user, info) = arg
+                if info.isMemorized {
+                    return History(userId: user.id!,
+                                   wordId: info.id,
+                                   learnedDate: Date())
+                        .save(on: req)
+                        .transform(to: HTTPStatus.ok)
+                } else {
+                    return History.query(on: req).group(.add) { history in
+                        history.filter(\.userId, .equal, user.id!)
+                            .filter(\.wordId, .equal, info.id)
+                    }
+                    .delete()
+                    .transform(to: HTTPStatus.ok)
+                }
+        }
     }
 
     router.get("\(apiVersion)/user") { req -> Future<UserInfo> in
@@ -135,8 +160,53 @@ public func routes(_ router: Router) throws {
             .first()
             .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .map { user -> UserInfo in
-                let stats = UserStatistics(today: 1, total: 1, categories: user.categories?.count ?? 0)
+                let stats = UserStatistics(today: 1,
+                                           total: 0,
+                                           categories: user.categories?.count ?? 0)
                 return UserInfo(info: user.public, statistics: stats)
+        }
+    }
+
+    router.get("\(apiVersion)/user/history") { req -> HTTPStatus in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+        return HTTPStatus.ok
+//        return User.query(on: req)
+//            .filter(\.login, .equal, token)
+//            .join(\User.id, to: \History.userId)
+//            .alsoDecode(History.self)
+//            .all()
+//            .map { array in
+//                return array.compactMap { arg -> EventLoopFuture<[LearningHistory]> in
+//                    let (user, history) = arg
+//                    let word = history.word.get(on: req)
+//                    let category = word.flatMap { $0.category.get(on: req) }
+//                    return word.and(category)
+//                        .flatMap { info -> LearningHistory in
+//                            let (word, category) = info
+//                            return LearningHistory(word: word, category: category, history: history)
+//                    }
+//                }
+//        }
+    }
+
+    router.get("\(apiVersion)/user/reset_statistics") { req -> Future<HTTPStatus> in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+        return User.query(on: req)
+            .filter(\.login, .equal, token)
+            .first()
+            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .then { user in
+                var user = user
+                user.history = nil
+                return History.query(on: req)
+                    .filter(\.userId, .equal, user.id!)
+                    .delete()
+                    .and(user.update(on: req))
+                    .transform(to: HTTPStatus.ok)
         }
     }
 

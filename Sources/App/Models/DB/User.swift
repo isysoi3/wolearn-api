@@ -23,19 +23,26 @@ struct User: PostgreSQLModel {
     var surname: String
     var password: String
     var categories: [Int]?
+    var history: [Int]?
+
+//    var history: Children<User, History> {
+//        children(\.userId)
+//    }
 
     init(id: ID? = nil,
          login: String,
          name: String,
          surname: String,
          password: String,
-         categories: [Int]? = nil) {
+         categories: [Int]? = nil,
+         history: [Int]? = nil) {
         self.id = id
         self.login = login
         self.name = name
         self.surname = surname
         self.password = password
         self.categories = categories
+        self.history = history
     }
 
     struct Public: Content {
@@ -63,10 +70,7 @@ extension User: PostgreSQLMigration {
 
     static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
         return Database.update(User.self, on: conn) { builder in
-            let defaultValueConstraint = PostgreSQLColumnConstraint.default(.literal(""))
-            builder.field(for: \.name, type: PostgreSQLDataType.text, defaultValueConstraint)
-            builder.field(for: \.surname, type: PostgreSQLDataType.text, defaultValueConstraint)
-            builder.field(for: \.password, type: PostgreSQLDataType.text, defaultValueConstraint)
+            builder.field(for: \.history)
         }
     }
 
@@ -102,5 +106,3 @@ extension Future where T == User {
         }
     }
 }
-
-//extension User: Content { }

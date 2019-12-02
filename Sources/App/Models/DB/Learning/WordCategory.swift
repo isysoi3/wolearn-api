@@ -18,6 +18,9 @@ struct WordCategory: PostgreSQLModel {
     var id: ID?
     var name: String
     var image: String
+    var word: Children<WordCategory, Word> {
+        children(\.categoryId)
+    }
 
     init(id: ID? = nil, name: String, image: String) {
         self.id = id
