@@ -167,31 +167,27 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.get("\(apiVersion)/user/history") { req -> HTTPStatus in
+    router.post("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
         guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
-        return HTTPStatus.ok
-//        return User.query(on: req)
-//            .filter(\.login, .equal, token)
-//            .join(\User.id, to: \History.userId)
-//            .alsoDecode(History.self)
-//            .all()
-//            .map { array in
-//                return array.compactMap { arg -> EventLoopFuture<[LearningHistory]> in
-//                    let (user, history) = arg
-//                    let word = history.word.get(on: req)
-//                    let category = word.flatMap { $0.category.get(on: req) }
-//                    return word.and(category)
-//                        .flatMap { info -> LearningHistory in
-//                            let (word, category) = info
-//                            return LearningHistory(word: word, category: category, history: history)
-//                    }
-//                }
-//        }
+        return User.query(on: req)
+            .join(\History.userId, to: \User.id)
+            .filter(\.login, .equal, token)
+            .alsoDecode(History.self)
+            .join(\Word.id, to: \History.wordId)
+            .alsoDecode(Word.self)
+            .join(\WordCategory.id, to: \Word.categoryId)
+            .alsoDecode(WordCategory.self)
+            .all()
+            .map { array in
+                return array.compactMap {
+                    LearningHistory(word: $0.0.1, category: $0.1, history: $0.0.0.1)
+                }
+        }
     }
 
-    router.get("\(apiVersion)/user/reset_statistics") { req -> Future<HTTPStatus> in
+    router.post("\(apiVersion)/user/reset_statistics") { req -> Future<HTTPStatus> in
         guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }

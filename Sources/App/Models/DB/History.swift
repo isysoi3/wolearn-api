@@ -46,13 +46,10 @@ struct LearningHistory: Content {
     let category: String
     let date: String
 
-    init(word: Word, category: Word,history: History) {
+    init(word: Word, category: WordCategory, history: History) {
         self.word = word.name
         self.category = category.name
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone(abbreviation: "UTC")
-        date = dateFormatter.string(from: history.learnedDate)
+        date = history.learnedDate.description
     }
 
 }
