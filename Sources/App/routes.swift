@@ -167,7 +167,7 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.post("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
+    router.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
         guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
