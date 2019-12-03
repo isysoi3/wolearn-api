@@ -168,9 +168,13 @@ public func routes(_ router: Router) throws {
     }
 
     router.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+        guard
+            let token = try? req.query.get(String.self, at: ["token"]),
+            let offset = try? req.query.get(Int.self, at: ["offset"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
+        let num = (try? req.query.get(Int.self, at: ["num"])) ?? 20
+
         return User.query(on: req)
             .join(\History.userId, to: \User.id)
             .filter(\.login, .equal, token)
@@ -179,6 +183,7 @@ public func routes(_ router: Router) throws {
             .alsoDecode(Word.self)
             .join(\WordCategory.id, to: \Word.categoryId)
             .alsoDecode(WordCategory.self)
+            .range(lower: offset, upper: offset + num - 1)
             .all()
             .map { array in
                 return array.compactMap {
