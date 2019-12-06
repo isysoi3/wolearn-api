@@ -103,18 +103,25 @@ public func routes(_ router: Router) throws {
         .transform(to: HTTPStatus.ok )
     }
 
-    router.get("\(apiVersion)/words") { req -> Future<[LearningWord]> in
-        guard let _ = try? req.query.get(String.self, at: ["token"]) else {
+    router.get("\(apiVersion)/learn") { req -> Future<[LearningWord]> in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
-        return Word.query(on: req)
-            .join(\Quiz.wordId, to: \Word.id)
-            .alsoDecode(Quiz.self)
+        return User.query(on: req)
+            .join(\History.userId, to: \User.id)
+            .filter(\.login, .equal, token)
+            .alsoDecode(History.self)
             .all()
-            .map { array -> [LearningWord] in
-                return array.map { word, quiz -> LearningWord in
-                    LearningWord(word: word, quiz: quiz)
-                }
+            .and(Word.query(on: req)
+                .join(\Quiz.wordId, to: \Word.id)
+                .alsoDecode(Quiz.self)
+                .all()
+            )
+            .map { arg in
+                let userWords = arg.0.map { $0.1 }.map { $0.wordId }
+                let learningWords = arg.1.map { LearningWord(word: $0.0, quiz: $0.1) }
+
+                return Array(learningWords.filter { !userWords.contains($0.id!) }.shuffled().choose(20))
         }
     }
 
