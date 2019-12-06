@@ -135,7 +135,7 @@ public func routes(_ router: Router) throws {
                 return array.map { item -> Future<LearningWord> in
                     return req.future(LearningWord(word: item.0.1, quiz: item.1))
                 }.flatten(on: req)
-        }
+        }.map { Array($0.shuffled().choose(20)) }
     }
 
     router.post("\(apiVersion)/word") { req -> Future<HTTPStatus> in
