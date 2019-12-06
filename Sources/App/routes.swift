@@ -118,6 +118,26 @@ public func routes(_ router: Router) throws {
         }
     }
 
+    router.get("\(apiVersion)/repeat") { req -> Future<[LearningWord]> in
+        guard let token = try? req.query.get(String.self, at: ["token"]) else {
+            throw Abort(.badRequest, reason: "No token")
+        }
+        return User.query(on: req)
+            .join(\History.userId, to: \User.id)
+            .filter(\.login, .equal, token)
+            .alsoDecode(History.self)
+            .join(\Word.id, to: \History.wordId)
+            .alsoDecode(Word.self)
+            .join(\Quiz.wordId, to: \Word.id)
+            .alsoDecode(Quiz.self)
+            .all()
+            .then { array -> Future<[LearningWord]> in
+                return array.map { item -> Future<LearningWord> in
+                    return req.future(LearningWord(word: item.0.1, quiz: item.1))
+                }.flatten(on: req)
+        }
+    }
+
     router.post("\(apiVersion)/word") { req -> Future<HTTPStatus> in
         guard let token = try? req.query.get(String.self, at: ["token"]) else {
             throw Abort(.badRequest, reason: "No token")
