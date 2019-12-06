@@ -9,6 +9,7 @@ import Foundation
 import FluentPostgreSQL
 import Vapor
 import Crypto
+import Authentication
 
 struct User: PostgreSQLModel {
 
@@ -78,6 +79,10 @@ extension User: PostgreSQLMigration {
         return conn.future()
     }
 
+}
+
+extension User: TokenAuthenticatable {
+    typealias TokenType = Token
 }
 
 extension User {

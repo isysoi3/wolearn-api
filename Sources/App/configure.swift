@@ -1,9 +1,11 @@
 import FluentPostgreSQL
 import Vapor
+import Authentication
 
 /// Called before your application initializes.
 public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
 
+    try services.register(AuthenticationProvider())
     try services.register(FluentPostgreSQLProvider())
 
     guard
@@ -49,5 +51,6 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     migrations.add(model: Quiz.self, database: .psql)
     migrations.add(model: User.self, database: .psql)
     migrations.add(model: History.self, database: .psql)
+    migrations.add(model: Token.self, database: .psql)
     services.register(migrations)
 }

@@ -25,18 +25,19 @@ public func routes(_ router: Router) throws {
     }
 
     // MARK: - no auth
-    router.post("\(apiVersion)/login") { req -> Future<Token> in
+    router.post("\(apiVersion)/login") { req -> Future<Token.Public> in
         return try req.content.decode(RequestLoginData.self)
-            .then { requestInfo in
+            .then { requestInfo -> Future<Token.Public> in
                 return User.query(on: req)
                     .filter(\.login, .equal, requestInfo.login)
                     .first()
                     .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-                    .map { user in
+                    .flatMap { user -> Future<Token.Public> in
                         guard (try? BCrypt.verify(requestInfo.password, created: user.password)) != nil else {
                             throw Abort(.unauthorized, reason: "User not found")
                         }
-                        return Token(token: user.login)
+                        let token = try Token.generate(for: user)
+                        return token.save(on: req).convertToPublic()
                 }
 
         }
@@ -46,21 +47,17 @@ public func routes(_ router: Router) throws {
         return try req.content
             .decode(User.self)
             .save(on: req)
-            .transform(to: HTTPStatus.ok )
+            .transform(to: HTTPStatus.created)
     }
 
+    let tokenAuthenticationMiddleware = User.tokenAuthMiddleware()
+    let authedRoutes = router.grouped(tokenAuthenticationMiddleware)
+    
     // MARK: - auth
-    router.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
-        return User.query(on: req)
-            .filter(\.login, .equal, token)
-            .first()
-            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-            .and(WordCategory.query(on: req).all())
-            .map { (arg) -> [UserWordCategory] in
-                let (user, wordCategories) = arg
+    authedRoutes.get("\(apiVersion)/categories") { req -> Future<[UserWordCategory]> in
+        let user = try req.requireAuthenticated(User.self)
+        return WordCategory.query(on: req).all()
+            .map { wordCategories -> [UserWordCategory] in
                 return wordCategories.map { category in
                     let isSelected = user.categories?.contains(category.id!) ?? false
                     return UserWordCategory(category: category,
@@ -69,47 +66,36 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.post("\(apiVersion)/categories") { req -> Future<HTTPStatus> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
+    authedRoutes.post("\(apiVersion)/categories") { req -> Future<HTTPStatus> in
+        var user = try req.requireAuthenticated(User.self)
         guard let requestInfo = try? req.content.decode([RequestCategoryData].self) else {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
         return requestInfo
             .then { newCategories -> EventLoopFuture<User> in
-                return User.query(on: req)
-                    .filter(\.login, .equal, token)
-                    .first()
-                    .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-                    .then { user -> EventLoopFuture<User> in
-                        var user = user
-                        var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
-                        user.categories?.forEach { categoryId in
-                            if !newUserCategories.contains(where: {$0 == categoryId}) {
-                                newUserCategories.append(categoryId)
-                            }
-                        }
-                        newCategories.compactMap { !$0.isSelected ? $0.id : nil }
-                            .forEach { categoryId in
-                                if newUserCategories.contains(where: {$0 == categoryId}) {
-                                    newUserCategories.removeAll(where: {$0 == categoryId})
-                                }
-                        }
-                        user.categories = newUserCategories
-                        return user.update(on: req)
+                var newUserCategories = newCategories.compactMap { $0.isSelected ? $0.id : nil }
+                user.categories?.forEach { categoryId in
+                    if !newUserCategories.contains(where: {$0 == categoryId}) {
+                        newUserCategories.append(categoryId)
+                    }
                 }
-            }
+                newCategories.compactMap { !$0.isSelected ? $0.id : nil }
+                    .forEach { categoryId in
+                        if newUserCategories.contains(where: {$0 == categoryId}) {
+                            newUserCategories.removeAll(where: {$0 == categoryId})
+                        }
+                }
+                user.categories = newUserCategories
+                return user.update(on: req)
+        }
         .transform(to: HTTPStatus.ok )
     }
 
-    router.get("\(apiVersion)/learn") { req -> Future<[LearningWord]> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
+    authedRoutes.get("\(apiVersion)/learn") { req -> Future<[LearningWord]> in
+        let user = try req.requireAuthenticated(User.self)
         return User.query(on: req)
             .join(\History.userId, to: \User.id)
-            .filter(\.login, .equal, token)
+            .filter(\.login, .equal, user.login)
             .alsoDecode(History.self)
             .all()
             .and(Word.query(on: req)
@@ -125,13 +111,11 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.get("\(apiVersion)/repeat") { req -> Future<[LearningWord]> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
+    authedRoutes.get("\(apiVersion)/repeat") { req -> Future<[LearningWord]> in
+        let user = try req.requireAuthenticated(User.self)
         return User.query(on: req)
             .join(\History.userId, to: \User.id)
-            .filter(\.login, .equal, token)
+            .filter(\.login, .equal, user.login)
             .alsoDecode(History.self)
             .join(\Word.id, to: \History.wordId)
             .alsoDecode(Word.self)
@@ -145,21 +129,13 @@ public func routes(_ router: Router) throws {
         }.map { Array($0.shuffled().choose(20)) }
     }
 
-    router.post("\(apiVersion)/word") { req -> Future<HTTPStatus> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
+    authedRoutes.post("\(apiVersion)/word") { req -> Future<HTTPStatus> in
+        var user = try req.requireAuthenticated(User.self)
         guard let requestInfo = try? req.content.decode(RequestWordData.self) else {
             throw Abort(.badRequest, reason: "No requestInfo")
         }
-
-        return User.query(on: req)
-            .filter(\.login, .equal, token)
-            .first()
-            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-            .and(requestInfo)
-            .then { arg -> Future<HTTPStatus> in
-                var (user, info) = arg
+        return requestInfo
+            .then { info -> Future<HTTPStatus> in
                 if info.isMemorized {
                     return History(userId: user.id!,
                                    wordId: info.id,
@@ -193,26 +169,17 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.get("\(apiVersion)/user") { req -> Future<UserInfo> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
-
-        return User.query(on: req)
-            .filter(\.login, .equal, token)
-            .first()
-            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-            .map { user -> UserInfo in
-                let stats = UserStatistics(today: 1,
-                                           total: user.history?.count ?? 0,
-                                           categories: user.categories?.count ?? 0)
-                return UserInfo(info: user.public, statistics: stats)
-        }
+    authedRoutes.get("\(apiVersion)/user") { req -> UserInfo in
+        let user = try req.requireAuthenticated(User.self)
+        let stats = UserStatistics(today: 1,
+                                   total: user.history?.count ?? 0,
+                                   categories: user.categories?.count ?? 0)
+        return UserInfo(info: user.public, statistics: stats)
     }
 
-    router.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
+    authedRoutes.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
+        let user = try req.requireAuthenticated(User.self)
         guard
-            let token = try? req.query.get(String.self, at: ["token"]),
             let offset = try? req.query.get(Int.self, at: ["offset"]) else {
             throw Abort(.badRequest, reason: "No token")
         }
@@ -220,7 +187,7 @@ public func routes(_ router: Router) throws {
 
         return User.query(on: req)
             .join(\History.userId, to: \User.id)
-            .filter(\.login, .equal, token)
+            .filter(\.login, .equal, user.login)
             .alsoDecode(History.self)
             .join(\Word.id, to: \History.wordId)
             .alsoDecode(Word.self)
@@ -235,23 +202,14 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    router.post("\(apiVersion)/user/reset_statistics") { req -> Future<HTTPStatus> in
-        guard let token = try? req.query.get(String.self, at: ["token"]) else {
-            throw Abort(.badRequest, reason: "No token")
-        }
-        return User.query(on: req)
-            .filter(\.login, .equal, token)
-            .first()
-            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
-            .then { user in
-                var user = user
-                user.history = nil
-                return History.query(on: req)
-                    .filter(\.userId, .equal, user.id!)
-                    .delete()
-                    .and(user.update(on: req))
-                    .transform(to: HTTPStatus.ok)
-        }
+    authedRoutes.post("\(apiVersion)/user/reset_statistics") { req -> Future<HTTPStatus> in
+        var user = try req.requireAuthenticated(User.self)
+        user.history = nil
+        return History.query(on: req)
+            .filter(\.userId, .equal, user.id!)
+            .delete()
+            .and(user.update(on: req))
+            .transform(to: HTTPStatus.ok)
     }
 
     // Example of configuring a controller
