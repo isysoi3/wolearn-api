@@ -169,12 +169,18 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    authedRoutes.get("\(apiVersion)/user") { req -> UserInfo in
+    authedRoutes.get("\(apiVersion)/user") { req -> Future<UserInfo> in
         let user = try req.requireAuthenticated(User.self)
-        let stats = UserStatistics(today: 1,
-                                   total: user.history?.count ?? 0,
-                                   categories: user.categories?.count ?? 0)
-        return UserInfo(info: user.public, statistics: stats)
+        return try History.query(on: req)
+            .filter(\History.userId, .equal, user.requireID())
+            .all()
+            .map { history -> UserInfo in
+                let todayWords = history.filter { Calendar.current.isDateInToday($0.learnedDate) }
+                let stat = UserStatistics(today: todayWords.count,
+                                          total: user.history?.count ?? 0,
+                                          categories: user.categories?.count ?? 0)
+                return UserInfo(info: user.public, statistics: stat)
+        }
     }
 
     authedRoutes.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
