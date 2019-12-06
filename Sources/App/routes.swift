@@ -132,20 +132,36 @@ public func routes(_ router: Router) throws {
             .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
             .and(requestInfo)
             .then { arg -> Future<HTTPStatus> in
-                let (user, info) = arg
+                var (user, info) = arg
                 if info.isMemorized {
                     return History(userId: user.id!,
                                    wordId: info.id,
                                    learnedDate: Date())
                         .save(on: req)
+                        .then { history -> Future<User> in
+                            if user.history == nil {
+                                user.history = []
+                            }
+                            user.history?.append(history.id!)
+                            return user.update(on: req)
+                        }
                         .transform(to: HTTPStatus.ok)
                 } else {
-                    return History.query(on: req).group(.add) { history in
+                    return History.query(on: req).group(.and) { history in
                         history.filter(\.userId, .equal, user.id!)
                             .filter(\.wordId, .equal, info.id)
                     }
-                    .delete()
-                    .transform(to: HTTPStatus.ok)
+                    .first()
+                    .flatMap { history -> Future<HTTPStatus> in
+                        guard let history = history else {
+                            return req.future(HTTPStatus.self).transform(to: HTTPStatus.ok)
+                        }
+                        let userHistory = user.history?.filter { history.id! != $0 }
+                        user.history = userHistory
+                        return history.delete(on: req)
+                            .and(user.update(on: req))
+                            .transform(to: HTTPStatus.ok)
+                    }
                 }
         }
     }
@@ -161,7 +177,7 @@ public func routes(_ router: Router) throws {
             .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .map { user -> UserInfo in
                 let stats = UserStatistics(today: 1,
-                                           total: 0,
+                                           total: user.history?.count ?? 0,
                                            categories: user.categories?.count ?? 0)
                 return UserInfo(info: user.public, statistics: stats)
         }
