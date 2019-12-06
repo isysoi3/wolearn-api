@@ -57,7 +57,7 @@ public func routes(_ router: Router) throws {
         return User.query(on: req)
             .filter(\.login, .equal, token)
             .first()
-            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .and(WordCategory.query(on: req).all())
             .map { (arg) -> [UserWordCategory] in
                 let (user, wordCategories) = arg
@@ -129,7 +129,7 @@ public func routes(_ router: Router) throws {
         return User.query(on: req)
             .filter(\.login, .equal, token)
             .first()
-            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .and(requestInfo)
             .then { arg -> Future<HTTPStatus> in
                 var (user, info) = arg
@@ -215,7 +215,7 @@ public func routes(_ router: Router) throws {
         return User.query(on: req)
             .filter(\.login, .equal, token)
             .first()
-            .unwrap(or: Abort(.nonAuthoritativeInformation, reason: "User not found"))
+            .unwrap(or: Abort(.unauthorized, reason: "User not found"))
             .then { user in
                 var user = user
                 user.history = nil
