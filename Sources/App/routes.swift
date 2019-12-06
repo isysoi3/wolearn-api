@@ -182,6 +182,11 @@ public func routes(_ router: Router) throws {
                 return UserInfo(info: user.public, statistics: stat)
         }
     }
+    
+    authedRoutes.delete("\(apiVersion)/user") { req -> Future<HTTPStatus> in
+        let user = try req.requireAuthenticated(User.self)
+        return user.delete(on: req).transform(to: .ok)
+    }
 
     authedRoutes.get("\(apiVersion)/user/history") { req -> Future<[LearningHistory]> in
         let user = try req.requireAuthenticated(User.self)
