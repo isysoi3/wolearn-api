@@ -33,7 +33,9 @@ public func routes(_ router: Router) throws {
                     .first()
                     .unwrap(or: Abort(.unauthorized, reason: "User not found"))
                     .flatMap { user -> Future<Token.Public> in
-                        guard (try? BCrypt.verify(requestInfo.password, created: user.password)) != nil else {
+                        guard
+                            let isValidPassword = try? BCrypt.verify(requestInfo.password, created: user.password),
+                            isValidPassword else {
                             throw Abort(.unauthorized, reason: "User not found")
                         }
                         let token = try Token.generate(for: user)
